@@ -15,6 +15,11 @@ export async function fetchTemplates(): Promise<TemplateInfo[]> {
   return handleResponse<TemplateInfo[]>(response)
 }
 
+export async function fetchTemplateFields(): Promise<Record<string, any>> {
+  const response = await fetch(`${API_BASE}/api/templates/fields`)
+  return handleResponse<Record<string, any>>(response)
+}
+
 export async function processFiles(files: File[]): Promise<DetectedData> {
   const formData = new FormData()
   files.forEach((file) => formData.append('files', file))

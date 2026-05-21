@@ -10,6 +10,7 @@ from backend.services.document_service import generate_document
 from backend.services.file_service import save_upload_file, validate_upload_file
 from backend.services.ocr_service import extract_detected_data, extract_text_from_file
 from backend.services.template_service import get_template_path, list_templates
+from backend.services.template_mapper import scan_templates_with_mapping
 
 
 router = APIRouter(prefix="/api", tags=["convenios"])
@@ -29,6 +30,13 @@ def health() -> dict[str, str]:
 @router.get("/templates", response_model=list[TemplateInfo])
 def available_templates() -> list[TemplateInfo]:
     return [TemplateInfo(**template) for template in list_templates()]
+
+
+@router.get("/templates/fields")
+def templates_fields() -> dict:
+    from backend.core.config import TEMPLATES_DIR
+    mapping = scan_templates_with_mapping(TEMPLATES_DIR)
+    return mapping
 
 
 @router.post("/upload", response_model=UploadResponse)

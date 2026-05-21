@@ -4,7 +4,7 @@ import { DataEditor } from './components/DataEditor'
 import { Dropzone } from './components/Dropzone'
 import { ResultPanel } from './components/ResultPanel'
 import { TemplateSelect } from './components/TemplateSelect'
-import { fetchTemplates, generateDocument, processFiles } from './api'
+import { fetchTemplates, fetchTemplateFields, generateDocument, processFiles } from './api'
 import type { DetectedData, GenerateResult, TemplateInfo } from './types'
 import { RolesEditor } from './components/RolesEditor'
 
@@ -26,6 +26,7 @@ const emptyData: DetectedData = {
 function App() {
   const [files, setFiles] = useState<File[]>([])
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
+  const [templateFields, setTemplateFields] = useState<Record<string, any>>({})
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [data, setData] = useState<DetectedData>(emptyData)
   const [result, setResult] = useState<GenerateResult | null>(null)
@@ -37,9 +38,10 @@ function App() {
 
   useEffect(() => {
     setLoadingTemplates(true)
-    fetchTemplates()
-      .then((items) => {
+    Promise.all([fetchTemplates(), fetchTemplateFields()])
+      .then(([items, fields]) => {
         setTemplates(items)
+        setTemplateFields(fields)
         if (items[0]) setSelectedTemplate(items[0].filename)
       })
       .catch((templateError: unknown) => {
@@ -102,9 +104,6 @@ function App() {
                 Subí fotos o PDFs, corregí los datos detectados y descargá el convenio final sin depender de internet.
               </p>
             </div>
-            <div className="rounded-2xl bg-sand px-4 py-3 text-sm text-slate-700">
-              Pensado para personas mayores: pocos pasos, botones grandes y texto claro.
-            </div>
           </div>
         </header>
 
@@ -121,6 +120,30 @@ function App() {
                 {loadingTemplates && <span className="text-sm text-accent">Cargando...</span>}
               </div>
               <TemplateSelect templates={templates} value={selectedTemplate} onChange={setSelectedTemplate} />
+              {selectedTemplate && templateFields[selectedTemplate] && (
+                <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
+                  <div className="font-semibold text-slate-600">Campos detectados para la plantilla:</div>
+                  <ul className="mt-2 space-y-2">
+                    {templateFields[selectedTemplate].placeholders.length === 0 && (
+                      <li className="text-slate-500">No se detectaron placeholders.</li>
+                    )}
+                    {templateFields[selectedTemplate].placeholders.map((ph: string) => (
+                      <li key={ph} className="flex items-start justify-between gap-4">
+                        <div className="text-ink">{ph}</div>
+                        <div className="text-right text-xs text-slate-500">
+                          {(templateFields[selectedTemplate].mapping[ph] && templateFields[selectedTemplate].mapping[ph].inferred.field) ? (
+                            <>
+                              {templateFields[selectedTemplate].mapping[ph].inferred.field} • {(templateFields[selectedTemplate].mapping[ph].inferred.confidence*100).toFixed(0)}%
+                            </>
+                          ) : (
+                            <span className="italic">sin asignar</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <DataEditor data={data} onChange={(field, value) => setData((current) => ({ ...current, [field]: value }))} />

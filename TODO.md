@@ -26,6 +26,12 @@ Listado de tareas priorizadas para completar el proyecto y dejarlo operativo.
 - [x] Añadir E2E mínima: upload → process → edit → generate → download.
 - [ ] Mejorar UI para roles detectados (abogado, asegurado, tercero, auto, bici, hijos).
 
+## Tareas en curso
+
+- [~] Integrar frontend: mostrar y editar mapping de plantillas (UI para confirmar/reasignar placeholders).
+- [ ] Arreglar `tsconfig` para permitir `npm run build` (error `ignoreDeprecations`).
+- [ ] Health checks / auto-arranque para Ollama y `soffice`.
+
 ## Notas y comandos útiles
 
 - Instalar Homebrew (si falta):

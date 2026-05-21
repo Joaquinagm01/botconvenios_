@@ -18,6 +18,11 @@ export type TemplateInfo = {
   filename: string
 }
 
+export type TemplateFieldMapping = {
+  placeholders: string[]
+  mapping: Record<string, { snippet: string | null; inferred: { field: string | null; confidence: number; reason: string } }>
+}
+
 export type GenerateResult = {
   docx_name: string
   pdf_name: string
