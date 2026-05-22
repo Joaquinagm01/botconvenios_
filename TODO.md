@@ -24,7 +24,7 @@ Listado de tareas priorizadas para completar el proyecto y dejarlo operativo.
 - [ ] Añadir comprobación automática de dependencias al arranque (tesseract, soffice).
 - [ ] Documentar instalación en `README.md` (Homebrew, Tesseract, LibreOffice, Python deps).
 - [x] Añadir E2E mínima: upload → process → edit → generate → download.
-- [ ] Mejorar UI para roles detectados (abogado, asegurado, tercero, auto, bici, hijos).
+- [x] Mejorar UI para roles detectados (abogado, asegurado, tercero, auto, bici, hijos).
 
 ## Tareas en curso
 

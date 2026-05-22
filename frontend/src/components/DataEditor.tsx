@@ -31,7 +31,7 @@ export function DataEditor({ data, onChange }: DataEditorProps) {
           <label key={field.key as string} className="space-y-2">
             <span className="text-sm font-medium text-slate-600">{field.label}</span>
             <input
-              value={data[field.key]}
+              value={String(data[field.key] ?? '')}
               placeholder={field.placeholder}
               onChange={(event) => onChange(field.key, event.target.value)}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-ink outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/10"

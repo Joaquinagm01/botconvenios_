@@ -1,8 +1,9 @@
 """Ejemplo de pipeline que integra preprocesado, OCR híbrido, normalización y llamada a Ollama."""
 from typing import Dict, Any
 from backend.ocr.hybrid_ocr import ocr_hybrid_from_bytes
+from backend.services.ocr_service import extract_text_from_bytes
 from backend.ai.ollama_client import OllamaClient
-from backend.ai.prompts import PROMPT_DOCUMENT, PROMPT_ADDRESS, PROMPT_DNI
+from backend.ai.prompts import PROMPT_DOCUMENT, PROMPT_ADDRESS, PROMPT_DNI, PROMPT_DOCUMENT_V2
 from backend.parsers.address_normalizer import normalize_address
 from backend.parsers.dni_parser import parse_mrz
 from backend.validators.validators import validate_dni, validate_cuit, validate_email, normalize_phone, parse_date
@@ -16,15 +17,21 @@ logger = setup_logging()
 ollama = OllamaClient()
 
 def process_document_bytes(data: bytes, filename: str = "file.pdf", model: str = "phi4-mini") -> Dict[str, Any]:
-    # 1) OCR híbrido
-    texts = ocr_hybrid_from_bytes(data)
+    # 1) OCR híbrido (si es imagen). Para PDFs usamos el extractor que renderiza páginas.
+    if filename.lower().endswith('.pdf'):
+        fused = extract_text_from_bytes(data, filename)
+        texts = {'tesseract': '', 'easyocr': '', 'fused': fused}
+    else:
+        texts = ocr_hybrid_from_bytes(data)
 
     # 1.5) OCR por regiones para priorizar bloques (nombre, dni, direccion)
-    try:
-        region_outputs = ocr_regions_from_bytes(data)
-    except Exception as e:
-        logger.warning(f"No se pudo extraer regiones: {e}")
-        region_outputs = []
+    region_outputs = []
+    if not filename.lower().endswith('.pdf'):
+        try:
+            region_outputs = ocr_regions_from_bytes(data)
+        except Exception as e:
+            logger.warning(f"No se pudo extraer regiones: {e}")
+            region_outputs = []
 
     # heurísticas simples para elegir candidatas
     region_candidates: Dict[str, Dict] = {"dni": {"text": None, "score": 0.0},
@@ -54,7 +61,8 @@ def process_document_bytes(data: bytes, filename: str = "file.pdf", model: str =
     # Enviamos además las mejores candidatas de regiones para que el modelo priorice
     region_hint = {k: v for k, v in region_candidates.items() if v.get('text')}
     region_hint_text = json.dumps(region_hint, ensure_ascii=False)
-    prompt = PROMPT_DOCUMENT + "\n\nREGION_CANDIDATES:\n" + region_hint_text + "\n\nOCR_TEXT:\n" + texts.get('fused', '')
+    # Usar el prompt v2 que solicita 'valor','confidence' y 'source' por campo
+    prompt = PROMPT_DOCUMENT_V2 + "\n\nREGION_CANDIDATES:\n" + region_hint_text + "\n\nOCR_TEXT:\n" + texts.get('fused', '')
     try:
         ai_out = ollama.generate_json(model=model, prompt=prompt)
     except Exception as e:
@@ -62,10 +70,15 @@ def process_document_bytes(data: bytes, filename: str = "file.pdf", model: str =
         ai_out = {"error": str(e)}
 
     # 4) Normalize address example
-    addr_raw = ai_out.get('direccion_texto') if isinstance(ai_out, dict) else None
+    addr_raw = None
     addr_norm, addr_conf = ("", 0.0)
-    if addr_raw:
-        addr_norm, addr_conf = normalize_address(addr_raw.get('valor') if isinstance(addr_raw, dict) else addr_raw)
+    if isinstance(ai_out, dict):
+        d = ai_out.get('direccion_texto')
+        if isinstance(d, dict):
+            addr_raw = d.get('valor')
+            # si hay un valor, normalizar
+            if addr_raw:
+                addr_norm, addr_conf = normalize_address(addr_raw)
 
     # 5) post-validate and assemble fields with confidences
     def field(v, conf):

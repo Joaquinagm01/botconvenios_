@@ -1,4 +1,4 @@
-import type { DetectedData, GenerateResult, TemplateInfo } from './types'
+import type { DetectedData, GenerateResult, TemplateFieldMappingByTemplate, TemplateInfo } from './types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
@@ -15,9 +15,9 @@ export async function fetchTemplates(): Promise<TemplateInfo[]> {
   return handleResponse<TemplateInfo[]>(response)
 }
 
-export async function fetchTemplateFields(): Promise<Record<string, any>> {
+export async function fetchTemplateFields(): Promise<TemplateFieldMappingByTemplate> {
   const response = await fetch(`${API_BASE}/api/templates/fields`)
-  return handleResponse<Record<string, any>>(response)
+  return handleResponse<TemplateFieldMappingByTemplate>(response)
 }
 
 export async function processFiles(files: File[]): Promise<DetectedData> {

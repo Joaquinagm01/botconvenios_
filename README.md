@@ -24,6 +24,7 @@ Aplicación **100% LOCAL, GRATUITA y OPEN SOURCE** para generación automática 
 - Diseño simple, apto para personas mayores
 - Botones grandes, colores claros, instrucciones directas
 - Edición de datos antes de generar
+- Editor de roles con secciones dedicadas para abogado, asegurado, tercero, auto, bici e hijos
 
 ✅ **100% Local y Seguro**
 - Sin APIs externas

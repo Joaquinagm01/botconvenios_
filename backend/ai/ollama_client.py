@@ -1,6 +1,8 @@
 import requests
 from typing import Any, Dict
 from backend.core.logging_config import setup_logging
+import subprocess
+import shlex
 
 logger = setup_logging()
 
@@ -21,9 +23,21 @@ class OllamaClient:
             resp = requests.post(url, json=payload, timeout=60)
             resp.raise_for_status()
             return resp.json()
-        except Exception as e:
-            logger.exception("Error llamando a Ollama")
-            raise
+        except requests.exceptions.RequestException as e:
+            logger.warning("HTTP Ollama failed, falling back to CLI: %s", e)
+            # Fallback: use `ollama run` CLI with JSON format
+            try:
+                cmd = ["ollama", "run", model, prompt, "--format", "json"]
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if proc.returncode != 0:
+                    logger.error("ollama CLI failed: %s", proc.stderr)
+                    raise
+                # CLI returns JSON text
+                import json as _json
+                return _json.loads(proc.stdout)
+            except Exception as e2:
+                logger.exception("Error usando ollama CLI")
+                raise
 
     def generate_json(self, model: str, prompt: str, max_tokens: int = 512) -> Dict[str, Any]:
         """Llama a Ollama esperando que la salida sea JSON. Devuelve dict.

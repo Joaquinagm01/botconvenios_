@@ -1,5 +1,10 @@
 import pytesseract
-import easyocr
+try:
+    import easyocr
+    _HAS_EASYOCR = True
+except Exception:
+    easyocr = None
+    _HAS_EASYOCR = False
 from rapidfuzz import fuzz
 from typing import Dict, List, Tuple
 import numpy as np
@@ -15,6 +20,8 @@ _easy_reader = None
 
 def get_easy_reader(lang_list=['es']):
     global _easy_reader
+    if not _HAS_EASYOCR:
+        raise RuntimeError('easyocr no está instalado')
     if _easy_reader is None:
         _easy_reader = easyocr.Reader(lang_list, gpu=False)
     return _easy_reader
@@ -86,12 +93,15 @@ def ocr_hybrid_from_bytes(data: bytes) -> Dict[str, str]:
         logger.exception("Tesseract falló")
         t1 = ""
     # EasyOCR on original color
-    try:
-        reader = get_easy_reader(['es'])
-        raw_easy = reader.readtext(cv2.cvtColor(orig, cv2.COLOR_BGR2RGB))
-        t2 = ' '.join([t[1] for t in raw_easy])
-    except Exception:
-        logger.exception("EasyOCR falló")
+    if _HAS_EASYOCR:
+        try:
+            reader = get_easy_reader(['es'])
+            raw_easy = reader.readtext(cv2.cvtColor(orig, cv2.COLOR_BGR2RGB))
+            t2 = ' '.join([t[1] for t in raw_easy])
+        except Exception:
+            logger.exception("EasyOCR falló")
+            t2 = ""
+    else:
         t2 = ""
     fused = fuse_texts(t1, t2)
     return {"tesseract": t1.strip(), "easyocr": t2.strip(), "fused": fused.strip()}
@@ -112,12 +122,15 @@ def ocr_regions_from_bytes(data: bytes) -> List[Dict]:
         except Exception:
             gray = crop
         t = tesseract_ocr_image(gray, config='--oem 1 --psm 6')
-        try:
-            reader = get_easy_reader(['es'])
-            easy_raw = reader.readtext(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-            e = ' '.join([it[1] for it in easy_raw])
-        except Exception:
-            logger.exception("EasyOCR fallo en region")
+        if _HAS_EASYOCR:
+            try:
+                reader = get_easy_reader(['es'])
+                easy_raw = reader.readtext(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+                e = ' '.join([it[1] for it in easy_raw])
+            except Exception:
+                logger.exception("EasyOCR fallo en region")
+                e = ''
+        else:
             e = ''
         fused = fuse_texts(t, e)
         outputs.append({"bbox": r['bbox'], "tesseract": t.strip(), "easyocr": e.strip(), "fused": fused.strip()})

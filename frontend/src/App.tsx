@@ -5,8 +5,9 @@ import { Dropzone } from './components/Dropzone'
 import { ResultPanel } from './components/ResultPanel'
 import { TemplateSelect } from './components/TemplateSelect'
 import { fetchTemplates, fetchTemplateFields, generateDocument, processFiles } from './api'
-import type { DetectedData, GenerateResult, TemplateInfo } from './types'
+import type { DetectedData, GenerateResult, TemplateFieldMappingByTemplate, TemplateInfo } from './types'
 import { RolesEditor } from './components/RolesEditor'
+import { TemplateMappingEditor } from './components/TemplateMappingEditor'
 
 const emptyData: DetectedData = {
   nombre: '',
@@ -26,7 +27,8 @@ const emptyData: DetectedData = {
 function App() {
   const [files, setFiles] = useState<File[]>([])
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
-  const [templateFields, setTemplateFields] = useState<Record<string, any>>({})
+  const [templateFields, setTemplateFields] = useState<TemplateFieldMappingByTemplate>({})
+  const [templateMappingSources, setTemplateMappingSources] = useState<Record<string, string>>({})
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [data, setData] = useState<DetectedData>(emptyData)
   const [result, setResult] = useState<GenerateResult | null>(null)
@@ -49,6 +51,22 @@ function App() {
       })
       .finally(() => setLoadingTemplates(false))
   }, [])
+
+  useEffect(() => {
+    if (!selectedTemplate || !templateFields[selectedTemplate]) {
+      setTemplateMappingSources({})
+      return
+    }
+
+    const defaults: Record<string, string> = {}
+    for (const placeholder of templateFields[selectedTemplate].placeholders) {
+      const inferred = templateFields[selectedTemplate].mapping[placeholder]?.inferred?.field
+      if (inferred) {
+        defaults[placeholder] = inferred
+      }
+    }
+    setTemplateMappingSources(defaults)
+  }, [selectedTemplate, templateFields])
 
   const handleProcess = async () => {
     if (files.length === 0) {
@@ -77,11 +95,31 @@ function App() {
       return
     }
 
+    const dataWithTemplateAliases: Record<string, string | Record<string, string>> = {
+      ...data,
+      roles: { ...(data.roles ?? {}) },
+    }
+
+    // Alias de placeholders no estandar: permite completar plantillas con llaves numericas u otros tokens.
+    for (const [placeholder, source] of Object.entries(templateMappingSources)) {
+      if (!source) continue
+
+      if (source.startsWith('roles.')) {
+        const roleKey = source.replace('roles.', '')
+        const roleValue = data.roles?.[roleKey] ?? ''
+        dataWithTemplateAliases[placeholder] = roleValue
+        continue
+      }
+
+      const value = data[source as keyof DetectedData]
+      dataWithTemplateAliases[placeholder] = typeof value === 'string' ? value : ''
+    }
+
     setGenerating(true)
     setError('')
     setMessage('Generando documento...')
     try {
-      const generated = await generateDocument(selectedTemplate, data)
+      const generated = await generateDocument(selectedTemplate, dataWithTemplateAliases as DetectedData)
       setResult(generated)
       setMessage('Documento listo para descargar.')
     } catch (generateError: unknown) {
@@ -91,6 +129,21 @@ function App() {
       setGenerating(false)
     }
   }
+
+  const roleKeys = Object.keys(data.roles ?? {})
+  const sourceOptions = [
+    { value: 'nombre', label: 'Nombre' },
+    { value: 'apellido', label: 'Apellido' },
+    { value: 'dni', label: 'DNI' },
+    { value: 'cuit', label: 'CUIT' },
+    { value: 'direccion', label: 'Direccion' },
+    { value: 'monto', label: 'Monto' },
+    { value: 'fecha', label: 'Fecha' },
+    { value: 'telefono', label: 'Telefono' },
+    { value: 'email', label: 'Email' },
+    { value: 'razon_social', label: 'Razon social' },
+    ...roleKeys.map((key) => ({ value: `roles.${key}`, label: `Rol: ${key}` })),
+  ]
 
   return (
     <main className="min-h-screen bg-hero text-ink">
@@ -121,28 +174,15 @@ function App() {
               </div>
               <TemplateSelect templates={templates} value={selectedTemplate} onChange={setSelectedTemplate} />
               {selectedTemplate && templateFields[selectedTemplate] && (
-                <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
-                  <div className="font-semibold text-slate-600">Campos detectados para la plantilla:</div>
-                  <ul className="mt-2 space-y-2">
-                    {templateFields[selectedTemplate].placeholders.length === 0 && (
-                      <li className="text-slate-500">No se detectaron placeholders.</li>
-                    )}
-                    {templateFields[selectedTemplate].placeholders.map((ph: string) => (
-                      <li key={ph} className="flex items-start justify-between gap-4">
-                        <div className="text-ink">{ph}</div>
-                        <div className="text-right text-xs text-slate-500">
-                          {(templateFields[selectedTemplate].mapping[ph] && templateFields[selectedTemplate].mapping[ph].inferred.field) ? (
-                            <>
-                              {templateFields[selectedTemplate].mapping[ph].inferred.field} • {(templateFields[selectedTemplate].mapping[ph].inferred.confidence*100).toFixed(0)}%
-                            </>
-                          ) : (
-                            <span className="italic">sin asignar</span>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <TemplateMappingEditor
+                  templateName={selectedTemplate}
+                  templateMapping={templateFields[selectedTemplate]}
+                  selectedSources={templateMappingSources}
+                  sourceOptions={sourceOptions}
+                  onChangeSource={(placeholder, source) =>
+                    setTemplateMappingSources((current) => ({ ...current, [placeholder]: source }))
+                  }
+                />
               )}
             </div>
 

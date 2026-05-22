@@ -23,6 +23,8 @@ export type TemplateFieldMapping = {
   mapping: Record<string, { snippet: string | null; inferred: { field: string | null; confidence: number; reason: string } }>
 }
 
+export type TemplateFieldMappingByTemplate = Record<string, TemplateFieldMapping>
+
 export type GenerateResult = {
   docx_name: string
   pdf_name: string
