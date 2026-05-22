@@ -32,9 +32,25 @@ class OllamaClient:
                 if proc.returncode != 0:
                     logger.error("ollama CLI failed: %s", proc.stderr)
                     raise
-                # CLI returns JSON text
+                # CLI returns JSON text but may include control/ANSI sequences; limpiamos antes de parsear
                 import json as _json
-                return _json.loads(proc.stdout)
+                import re
+                out = proc.stdout
+                # Remove ANSI escape sequences
+                out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
+                # Remove other control characters except newline and tab
+                out = ''.join(ch for ch in out if ch == '\n' or ch == '\t' or ord(ch) >= 32)
+                try:
+                    return _json.loads(out)
+                except Exception:
+                    logger.warning("Fallo parse JSON directo desde CLI, intentando extraer bloque JSON. stdout:\n%s", out)
+                    # try to extract first {...} block
+                    start = out.find('{')
+                    end = out.rfind('}')
+                    if start != -1 and end != -1 and end > start:
+                        snippet = out[start:end+1]
+                        return _json.loads(snippet)
+                    raise
             except Exception as e2:
                 logger.exception("Error usando ollama CLI")
                 raise
